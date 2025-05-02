@@ -7,27 +7,22 @@ import json
 
 app = Flask(__name__)
 
-# 텔레그램 설정
 TELEGRAM_BOT_TOKEN = '7695863748:AAG-BXuSNB85vRdYvNq_LCemH1zCRm23sjQ'
 TELEGRAM_CHAT_ID = '1956090853'
 
-# 거래소 API 설정 (Bitget 실전용)
 EXCHANGE_API_KEY = 'bg_20ae8d8409bf0bf122ad61d090088323'
 EXCHANGE_API_SECRET = '1895222457d096486282b9813789ccf318c231f94f301ab20debbb8e5d6eef8c'
 EXCHANGE_API_PASSPHRASE = 'qkrwnsgud2408'
 BASE_URL = "https://api.bitget.com"
 
-# 사용자 설정값 (UI 변경 가능)
 LEVERAGE = 5
 ENTRY_PERCENT = 20
 
-# 상태 변수
 position = None
 tp1_done = False
 tp2_done = False
 bot_active = True
 
-# 텔레그램 전송 함수
 def send_telegram(message):
     url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
     data = {"chat_id": TELEGRAM_CHAT_ID, "text": message}
@@ -36,7 +31,6 @@ def send_telegram(message):
     except Exception as e:
         print("텔레그램 에러", e)
 
-# 거래소 주문 함수
 def exchange_order(order_type, side, size):
     timestamp = str(int(time.time() * 1000))
     method = "POST"
@@ -74,13 +68,11 @@ def exchange_order(order_type, side, size):
         send_telegram(f"[거래소 주문 에러] {e}")
         return False
 
-# 자동매매 실행
-
 def execute_order(signal, price):
     global position
 
     side = "롱" if signal.startswith("롱") else "숏"
-    qty = ENTRY_PERCENT  # 설정된 퍼센트 수량 사용
+    qty = ENTRY_PERCENT
 
     if signal in ["롱 진입", "숏 진입"]:
         exchange_order("시장가", side, qty)
@@ -88,8 +80,6 @@ def execute_order(signal, price):
         exchange_order("시장가", side, qty)
 
     send_telegram(f"🚨 [자동매매 실행]\n신호: {signal}\n가격: {price}")
-
-# 포지션 종료
 
 def close_position(reason):
     global position, tp1_done, tp2_done
@@ -117,11 +107,16 @@ def webhook():
     if not signal or not price:
         return jsonify({"status": "error", "message": "Invalid payload"}), 400
 
-    try:
-        if signal == "ping":
-    send_telegram("✅ [PING] 서버 정상 작동 중입니다.")
-    return jsonify({"status": "ping received"}), 200
+    # 📌 Ping 신호 처리
+    if signal == "ping":
+        send_telegram("✅ [PING] 서버 정상 작동 중입니다.")
+        return jsonify({"status": "ping received"}), 200
 
+    # 포지션 없을때 TP/SL 무시
+    if position is None and signal not in ["go_long", "go_short"]:
+        return jsonify({"status": "no position, ignored"}), 200
+
+    try:
         if signal == "go_long":
             if position == "short":
                 close_position("반대 신호 (숏 → 롱)")
@@ -171,7 +166,6 @@ def webhook():
 
     return jsonify({"status": "success"}), 200
 
-# UI 페이지
 @app.route("/")
 def index():
     return render_template_string("""
