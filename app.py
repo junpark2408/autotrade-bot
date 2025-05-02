@@ -118,6 +118,10 @@ def webhook():
         return jsonify({"status": "error", "message": "Invalid payload"}), 400
 
     try:
+        if signal == "ping":
+    send_telegram("✅ [PING] 서버 정상 작동 중입니다.")
+    return jsonify({"status": "ping received"}), 200
+
         if signal == "go_long":
             if position == "short":
                 close_position("반대 신호 (숏 → 롱)")
